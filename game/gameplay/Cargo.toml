@@ -1,0 +1,12 @@
+[package]
+name = "bevy_game_gameplay"               # ToDo
+version = "0.1.0"
+publish = false
+authors = ["Sean Sullivan <me@snen.dev>"] # ToDo: you are the author ;)
+edition = "2021"
+
+[dependencies]
+# workspace crates
+bevy_game_blueprints = { path = "../blueprint" }
+# bevy
+bevy = { version = "0.12", default-features = false }

@@ -1,0 +1,12 @@
+[package]
+name = "bevy_game_controls"               # ToDo
+version = "0.1.0"
+publish = false
+authors = ["Sean Sullivan <me@snen.dev>"] # ToDo: you are the author ;)
+edition = "2021"
+
+[dependencies]
+bevy_game_blueprints = { path = "../blueprint" }
+
+bevy = { version = "0.12", default-features = false }
+leafwing-input-manager = "0.11"

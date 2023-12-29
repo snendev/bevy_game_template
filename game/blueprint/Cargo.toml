@@ -1,0 +1,9 @@
+[package]
+name = "bevy_game_blueprints"             # ToDo
+version = "0.1.0"
+publish = false
+authors = ["Sean Sullivan <me@snen.dev>"]
+edition = "2021"
+
+[dependencies]
+bevy = { version = "0.12", default-features = false }

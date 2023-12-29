@@ -1,0 +1,14 @@
+[package]
+name = "bevy_game_flavor"                 # ToDo
+version = "0.1.0"
+publish = false
+authors = ["Sean Sullivan <me@snen.dev>"] # ToDo: you are the author ;)
+edition = "2021"
+
+[dependencies]
+# workspace crates
+bevy_game_blueprints = { path = "../blueprint" }
+# external crates
+bevy = { version = "0.12" }
+bevy_kira_audio = { version = "0.18" }
+bevy_asset_loader = { version = "0.19" }

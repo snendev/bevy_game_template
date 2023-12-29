@@ -1,6 +1,29 @@
-use crate::loading::TextureAssets;
-use crate::GameState;
 use bevy::prelude::*;
+use bevy_asset_loader::{
+    asset_collection::AssetCollection,
+    loading_state::{config::ConfigureLoadingState, LoadingState, LoadingStateAppExt},
+};
+
+use crate::GameState;
+
+#[derive(AssetCollection, Resource)]
+pub struct LogoAssets {
+    #[asset(path = "textures/bevy.png")]
+    pub bevy: Handle<Image>,
+    #[asset(path = "textures/github.png")]
+    pub github: Handle<Image>,
+}
+
+// This layer isn't particularly necessary, but may help manage groups of assets (for levels/etc)
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(States)]
+pub enum MenuLoadState {
+    // During the loading State the LoadingPlugin will load our assets
+    #[default]
+    Loading,
+    // During this State the actual game logic is executed
+    Active,
+}
 
 pub struct MenuPlugin;
 
@@ -8,8 +31,22 @@ pub struct MenuPlugin;
 /// The menu is only drawn during the State `GameState::Menu` and is removed when that state is exited
 impl Plugin for MenuPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(GameState::Menu), setup_menu)
-            .add_systems(Update, click_play_button.run_if(in_state(GameState::Menu)))
+        app.add_state::<MenuLoadState>()
+            .add_loading_state(
+                LoadingState::new(MenuLoadState::Loading)
+                    .continue_to_state(MenuLoadState::Active)
+                    .load_collection::<LogoAssets>(),
+            )
+            .add_systems(OnEnter(GameState::Menu), setup_menu)
+            .add_systems(
+                Update,
+                (
+                    handle_play_button_click,
+                    handle_logo_button_click,
+                    render_button_interactions,
+                )
+                    .run_if(in_state(GameState::Menu)),
+            )
             .add_systems(OnExit(GameState::Menu), cleanup_menu);
     }
 }
@@ -18,6 +55,7 @@ impl Plugin for MenuPlugin {
 struct ButtonColors {
     normal: Color,
     hovered: Color,
+    active: Color,
 }
 
 impl Default for ButtonColors {
@@ -25,6 +63,7 @@ impl Default for ButtonColors {
         ButtonColors {
             normal: Color::rgb(0.15, 0.15, 0.15),
             hovered: Color::rgb(0.25, 0.25, 0.25),
+            active: Color::rgb(0.30, 0.30, 0.30),
         }
     }
 }
@@ -32,11 +71,11 @@ impl Default for ButtonColors {
 #[derive(Component)]
 struct Menu;
 
-fn setup_menu(mut commands: Commands, textures: Res<TextureAssets>) {
-    info!("menu");
+fn setup_menu(mut commands: Commands, textures: Res<LogoAssets>) {
     commands.spawn(Camera2dBundle::default());
     commands
         .spawn((
+            Name::new("Menu"),
             NodeBundle {
                 style: Style {
                     width: Val::Percent(100.0),
@@ -81,6 +120,7 @@ fn setup_menu(mut commands: Commands, textures: Res<TextureAssets>) {
         });
     commands
         .spawn((
+            Name::new("Social Links"),
             NodeBundle {
                 style: Style {
                     flex_direction: FlexDirection::Row,
@@ -98,6 +138,7 @@ fn setup_menu(mut commands: Commands, textures: Res<TextureAssets>) {
         .with_children(|children| {
             children
                 .spawn((
+                    Name::new("Bevy Button"),
                     ButtonBundle {
                         style: Style {
                             width: Val::Px(170.0),
@@ -136,6 +177,7 @@ fn setup_menu(mut commands: Commands, textures: Res<TextureAssets>) {
                 });
             children
                 .spawn((
+                    Name::new("Github Button"),
                     ButtonBundle {
                         style: Style {
                             width: Val::Px(170.0),
@@ -151,12 +193,13 @@ fn setup_menu(mut commands: Commands, textures: Res<TextureAssets>) {
                     ButtonColors {
                         normal: Color::NONE,
                         hovered: Color::rgb(0.25, 0.25, 0.25),
+                        active: Color::rgb(0.25, 0.25, 0.25),
                     },
-                    OpenLink("https://github.com/NiklasEi/bevy_game_template"),
+                    OpenLink("https://github.com/snendev/bevy_game_template"),
                 ))
                 .with_children(|parent| {
                     parent.spawn(TextBundle::from_section(
-                        "Open source",
+                        "Source code",
                         TextStyle {
                             font_size: 15.0,
                             color: Color::rgb(0.9, 0.9, 0.9),
@@ -181,29 +224,39 @@ struct ChangeState(GameState);
 #[derive(Component)]
 struct OpenLink(&'static str);
 
-fn click_play_button(
+fn handle_play_button_click(
     mut next_state: ResMut<NextState<GameState>>,
+    interaction_query: Query<(&Interaction, &ChangeState), (Changed<Interaction>, With<Button>)>,
+) {
+    for (interaction, change_state) in interaction_query.iter() {
+        if let Interaction::Pressed = *interaction {
+            next_state.set(change_state.0);
+        }
+    }
+}
+
+fn handle_logo_button_click(
+    interaction_query: Query<(&Interaction, &OpenLink), (Changed<Interaction>, With<Button>)>,
+) {
+    for (interaction, open_link) in interaction_query.iter() {
+        if let Interaction::Pressed = *interaction {
+            if let Err(error) = webbrowser::open(open_link.0) {
+                warn!("Failed to open link {error:?}");
+            }
+        }
+    }
+}
+
+fn render_button_interactions(
     mut interaction_query: Query<
-        (
-            &Interaction,
-            &mut BackgroundColor,
-            &ButtonColors,
-            Option<&ChangeState>,
-            Option<&OpenLink>,
-        ),
+        (&Interaction, &mut BackgroundColor, &ButtonColors),
         (Changed<Interaction>, With<Button>),
     >,
 ) {
-    for (interaction, mut color, button_colors, change_state, open_link) in &mut interaction_query {
+    for (interaction, mut color, button_colors) in &mut interaction_query {
         match *interaction {
             Interaction::Pressed => {
-                if let Some(state) = change_state {
-                    next_state.set(state.0.clone());
-                } else if let Some(link) = open_link {
-                    if let Err(error) = webbrowser::open(link.0) {
-                        warn!("Failed to open link {error:?}");
-                    }
-                }
+                *color = button_colors.active.into();
             }
             Interaction::Hovered => {
                 *color = button_colors.hovered.into();
